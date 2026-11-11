@@ -1,0 +1,18 @@
+name = "html-host"
+main = "src/index.ts"
+compatibility_date = "2025-11-01"
+
+# KV stores HTML content
+[[kv_namespaces]]
+binding = "PAGES_KV"
+id = "YOUR_KV_NAMESPACE_ID"
+
+# D1 database for page metadata
+[[d1_databases]]
+binding = "DB"
+database_name = "html-host-db"
+database_id = "YOUR_D1_DATABASE_ID"
+
+[vars]
+# Change this to your admin password
+ADMIN_PASSWORD = "change-me"
