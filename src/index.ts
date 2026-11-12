@@ -31,6 +31,22 @@ async function isAdmin(c: any): Promise<boolean> {
   return token === expected;
 }
 
+// Scan uploaded HTML for risky constructs; returns risk level + warnings
+function scanHtml(html: string): { risk: string; warnings: string[] } {
+  const warnings: string[] = [];
+  if (/<script[\s>]/i.test(html)) warnings.push("包含 <script> 脚本标签");
+  if (/on\w+\s*=/i.test(html)) warnings.push("包含内联事件处理器（onclick 等）");
+  if (/javascript:/i.test(html)) warnings.push("包含 javascript: 伪协议链接");
+  if (/<iframe/i.test(html)) warnings.push("包含 iframe 嵌入");
+  if (/<form/i.test(html)) warnings.push("包含表单（可能用于钓鱼）");
+  if (/url\(\s*['"]?https?:/i.test(html)) warnings.push("引用了外部资源");
+
+  let risk = "safe";
+  if (warnings.length >= 3) risk = "high";
+  else if (warnings.length >= 1) risk = "medium";
+  return { risk, warnings };
+}
+
 // ---------- landing page ----------
 
 app.get("/", (c) => c.html(LANDING_HTML));
@@ -70,7 +86,7 @@ app.post("/_api/change-password", async (c) => {
 app.get("/_api/list", async (c) => {
   if (!(await isAdmin(c))) return c.json({ error: "未授权" }, 401);
   const { results } = await c.env.DB.prepare(
-    `SELECT path, title, views, created_at, updated_at,
+    `SELECT path, title, views, created_at, updated_at, risk,
             password != '' as has_password
      FROM pages ORDER BY updated_at DESC`
   ).all();
@@ -85,7 +101,7 @@ app.get("/_api/page/:path{.+}", async (c) => {
   const content = await c.env.PAGES_KV.get(`page:${path}`);
   if (content === null) return c.json({ error: "页面不存在" }, 404);
   const meta = await c.env.DB.prepare(
-    "SELECT path, title, password, views, created_at, updated_at FROM pages WHERE path = ?"
+    "SELECT path, title, password, views, risk, created_at, updated_at FROM pages WHERE path = ?"
   ).bind(path).first();
   return c.json({ path, content, meta });
 });
@@ -100,16 +116,20 @@ app.post("/_api/upload", async (c) => {
   if (!path) return c.json({ error: "请填写 URL 路径" }, 400);
   if (!content) return c.json({ error: "内容不能为空" }, 400);
 
+  // safety scan
+  const { risk, warnings } = scanHtml(content);
+
   const now = Math.floor(Date.now() / 1000);
   await c.env.PAGES_KV.put(`page:${path}`, content);
 
   await c.env.DB.prepare(
-    `INSERT INTO pages (path, title, password, views, created_at, updated_at)
-     VALUES (?, ?, ?, COALESCE((SELECT views FROM pages WHERE path = ?), 0), ?, ?)
-     ON CONFLICT(path) DO UPDATE SET title=?, password=?, updated_at=?`
-  ).bind(path, title || path, password || "", path, now, now, title || path, password || "", now).run();
+    `INSERT INTO pages (path, title, password, risk, views, created_at, updated_at)
+     VALUES (?, ?, ?, ?, COALESCE((SELECT views FROM pages WHERE path = ?), 0), ?, ?)
+     ON CONFLICT(path) DO UPDATE SET title=?, password=?, risk=?, updated_at=?`
+  ).bind(path, title || path, password || "", risk, path, now, now,
+        title || path, password || "", risk, now).run();
 
-  return c.json({ ok: true, path, url: `/${path}` });
+  return c.json({ ok: true, path, url: `/${path}`, risk, warnings });
 });
 
 // ---------- API: delete page ----------
@@ -135,7 +155,7 @@ app.get("/*", async (c) => {
   if (content === null) return c.notFound();
 
   const meta = await c.env.DB.prepare(
-    "SELECT password, views FROM pages WHERE path = ?"
+    "SELECT password, views, risk FROM pages WHERE path = ?"
   ).bind(path).first();
 
   // password gate
@@ -165,11 +185,42 @@ padding:0.6rem 1.5rem;border-radius:10px;cursor:pointer;font-weight:600}
     }
   }
 
-  // increment views (fire and forget)
-  c.env.DB.prepare("UPDATE pages SET views = views + 1 WHERE path = ?").bind(path).run().catch(() => {});
+  // ---- view counter (fixed) ----
+  // Skip counting when admin previews (Authorization header present)
+  const auth = c.req.header("Authorization") || "";
+  const isPreview = auth.replace("Bearer ", "") !== "";
+  if (!isPreview) {
+    // Ensure the row exists, then increment. Use waitUntil so the write
+    // survives after the response is sent back.
+    c.executionCtx.waitUntil(
+      c.env.DB.prepare(
+        `INSERT INTO pages (path, title, risk, views, created_at, updated_at)
+         VALUES (?, ?, '', 1, ?, ?)
+         ON CONFLICT(path) DO UPDATE SET views = views + 1`
+      ).bind(path, path, Math.floor(Date.now() / 1000), Math.floor(Date.now() / 1000)).run()
+    );
+  }
+
+  // CSP: allow self + inline (admin's own HTML commonly uses inline JS/CSS),
+  // but block plugins, restrict object/base/referrer to reduce abuse.
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-hashes'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    "frame-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
 
   return c.html(content, 200, {
     "Content-Type": "text/html; charset=utf-8",
+    "Content-Security-Policy": csp,
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Referrer-Policy": "no-referrer",
     "Cache-Control": "public, max-age=0, must-revalidate",
   });
 });
