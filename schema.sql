@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS pages (
   title TEXT NOT NULL DEFAULT '',
   password TEXT NOT NULL DEFAULT '',
   risk TEXT NOT NULL DEFAULT '',
+  owner TEXT NOT NULL DEFAULT 'admin',
+  expires_at INTEGER NOT NULL DEFAULT 0,
   views INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
@@ -11,3 +13,4 @@ CREATE TABLE IF NOT EXISTS pages (
 
 CREATE INDEX IF NOT EXISTS idx_pages_updated ON pages(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_pages_views ON pages(views DESC);
+CREATE INDEX IF NOT EXISTS idx_pages_expires ON pages(expires_at);
