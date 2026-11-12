@@ -112,6 +112,22 @@ h1 .grad{background:linear-gradient(120deg,var(--text) 20%,var(--primary) 60%,va
 footer{border-top:1px solid var(--border);padding:2rem 0;text-align:center;
   color:var(--faint);font-size:.82rem}
 footer a{color:var(--primary);text-decoration:none}
+
+@media(max-width:640px){
+  .wrap{padding:0 1.4rem}
+  nav{flex-direction:column;align-items:flex-start;gap:.9rem;padding:1.2rem 0}
+  .nav-links{width:100%;flex-wrap:wrap;gap:.9rem}
+  .hero{padding:3rem 0 2.5rem}
+  h1{font-size:clamp(2rem,8.5vw,2.6rem)}
+  .subtitle{font-size:1rem;padding:0 .2rem}
+  .cta{gap:.7rem}
+  .btn{padding:.8rem 1.4rem}
+  .strip{gap:1.4rem;margin-top:2.2rem}
+  .features{padding:2rem 0 3.5rem}
+  .grid{gap:.85rem}
+  .card{padding:1.35rem}
+  .card-icon{width:40px;height:40px;font-size:1.15rem;margin-bottom:.8rem}
+}
 </style>
 </head>
 <body>
