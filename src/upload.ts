@@ -1,0 +1,267 @@
+export const UPLOAD_HTML = `<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark-purple">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>投稿 · HTML Host</title>
+<style>
+:root, [data-theme="dark-purple"]{
+  --bg:#0b0d14;--panel:rgba(255,255,255,.04);--panel-2:rgba(255,255,255,.07);
+  --border:rgba(255,255,255,.09);--border-hi:rgba(139,109,255,.4);
+  --text:#f2f3f7;--muted:#9aa0b4;--faint:#626880;
+  --primary:#8b6dff;--primary-2:#a78bff;--accent:#4dd6ff;--pink:#ff6b9d;
+  --green:#3ddc97;--yellow:#ffd166;--red:#ff5c7c;
+}
+[data-theme="dark-cyan"]{
+  --bg:#071014;--panel:rgba(255,255,255,.04);--panel-2:rgba(255,255,255,.06);
+  --border:rgba(255,255,255,.08);--border-hi:rgba(77,214,255,.35);
+  --text:#eef6f8;--muted:#8fa6ad;--faint:#5a7078;
+  --primary:#2ec4e6;--primary-2:#66d8f0;--accent:#8b6dff;--pink:#ff6b9d;
+}
+[data-theme="light"]{
+  --bg:#f6f7fb;--panel:rgba(255,255,255,.72);--panel-2:#ffffff;
+  --border:rgba(15,23,42,.1);--border-hi:rgba(124,92,252,.35);
+  --text:#0f172a;--muted:#55607a;--faint:#8a93a8;
+  --primary:#6a4be0;--primary-2:#7c5cfc;--accent:#0ea5c4;--pink:#e0487a;
+}
+[data-theme="oled"]{
+  --bg:#000000;--panel:rgba(255,255,255,.03);--panel-2:rgba(255,255,255,.05);
+  --border:rgba(255,255,255,.1);--border-hi:rgba(139,109,255,.4);
+  --text:#f5f5f7;--muted:#8a8a96;--faint:#55555f;
+  --primary:#8b6dff;--primary-2:#a78bff;--accent:#4dd6ff;--pink:#ff6b9d;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  background:var(--bg);color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+body::before{content:'';position:fixed;inset:0;z-index:-1;
+  background:radial-gradient(800px 400px at 20% -10%,color-mix(in srgb,var(--primary) 14%,transparent),transparent 60%),
+             radial-gradient(600px 300px at 85% 100%,color-mix(in srgb,var(--accent) 8%,transparent),transparent 55%)}
+.wrap{max-width:760px;margin:0 auto;padding:1.5rem}
+nav{display:flex;align-items:center;justify-content:space-between;padding:1rem 0 1.5rem}
+.logo{display:flex;align-items:center;gap:.6rem;font-weight:700}
+.logo-mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--pink));
+  display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.nav-links{display:flex;gap:1rem;align-items:center}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:.88rem}
+.nav-links a:hover{color:var(--text)}
+.theme-select{background:var(--panel);border:1px solid var(--border);color:var(--text);
+  border-radius:10px;padding:.45rem .7rem;font-size:.82rem;outline:none;cursor:pointer}
+
+.card{background:var(--panel);border:1px solid var(--border);border-radius:20px;
+  padding:1.8rem;backdrop-filter:blur(12px)}
+h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
+.sub{color:var(--muted);font-size:.9rem;line-height:1.7;margin-bottom:1.5rem}
+.notice{background:color-mix(in srgb,var(--yellow) 10%,transparent);border:1px solid color-mix(in srgb,var(--yellow) 30%,transparent);
+  color:var(--yellow);border-radius:12px;padding:.8rem 1rem;font-size:.8rem;line-height:1.6;margin-bottom:1.5rem}
+
+.drop-zone{border:2px dashed var(--border);border-radius:14px;padding:1.5rem;text-align:center;
+  color:var(--muted);cursor:pointer;margin-bottom:1rem;transition:.2s}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--primary);color:var(--primary-2);
+  background:color-mix(in srgb,var(--primary) 5%,transparent)}
+.drop-zone svg{width:28px;height:28px;margin-bottom:.5rem;opacity:.5}
+
+.form-group{margin-bottom:1rem}
+.form-group label{display:block;font-size:.75rem;color:var(--muted);margin-bottom:.35rem;font-weight:500}
+.form-group input,.form-group textarea{width:100%;padding:.7rem .95rem;border-radius:12px;
+  border:1px solid var(--border);background:color-mix(in srgb,var(--bg) 60%,transparent);
+  color:var(--text);font-size:.9rem;outline:none;transition:.2s}
+.form-group input:focus,.form-group textarea:focus{border-color:var(--primary);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 18%,transparent)}
+.form-group textarea{font-family:'SF Mono',Monaco,Consolas,monospace;font-size:.8rem;
+  line-height:1.6;min-height:260px;resize:vertical;tab-size:2}
+
+.risk-box{border-radius:11px;padding:.85rem 1rem;margin-bottom:1rem;font-size:.82rem;line-height:1.6;display:none}
+.risk-box.warn-medium{display:block;background:color-mix(in srgb,var(--yellow) 10%,transparent);
+  border:1px solid color-mix(in srgb,var(--yellow) 30%,transparent);color:var(--yellow)}
+.risk-box.warn-high{display:block;background:color-mix(in srgb,var(--red) 10%,transparent);
+  border:1px solid color-mix(in srgb,var(--red) 30%,transparent);color:var(--red)}
+.risk-box ul{margin:.3rem 0 0 1.1rem}
+
+.row{display:flex;gap:.75rem;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.btn{padding:.75rem 1.5rem;border:none;border-radius:12px;font-size:.9rem;font-weight:600;
+  cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:.4rem}
+.btn-primary{background:linear-gradient(135deg,var(--primary),#6a4be0);color:#fff}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px color-mix(in srgb,var(--primary) 35%,transparent)}
+.hint{font-size:.75rem;color:var(--faint)}
+
+.result{display:none;margin-top:1.5rem;padding:1.3rem;border-radius:14px;
+  background:var(--panel-2);border:1px solid var(--border)}
+.result.show{display:block;animation:fadeIn .25s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.result h3{font-size:1rem;margin-bottom:.6rem}
+.result-link{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.result-link a{color:var(--accent);text-decoration:none;font-weight:600;word-break:break-all}
+.copy-btn{background:var(--panel);border:1px solid var(--border);color:var(--muted);
+  border-radius:8px;padding:.35rem .7rem;font-size:.78rem;cursor:pointer}
+.badge{font-size:.68rem;padding:.2rem .6rem;border-radius:7px;font-weight:600}
+.badge-safe{background:color-mix(in srgb,var(--green) 13%,transparent);color:var(--green)}
+.badge-medium{background:color-mix(in srgb,var(--yellow) 15%,transparent);color:var(--yellow)}
+.badge-high{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red)}
+.result-meta{font-size:.78rem;color:var(--muted);margin-top:.6rem}
+
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(10px);
+  background:var(--panel-2);padding:.7rem 1.3rem;border-radius:11px;border:1px solid var(--border);
+  font-size:.85rem;opacity:0;transition:.3s;z-index:200}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:640px){
+  .wrap{padding:1.1rem}
+  .card{padding:1.3rem;border-radius:16px}
+  h1{font-size:1.25rem}
+  .drop-zone{padding:1.1rem}
+  .row{flex-direction:column;align-items:stretch;gap:.8rem}
+  .btn-primary{justify-content:center}
+}
+</style>
+</head>
+<body>
+<nav class="wrap">
+  <div class="logo"><div class="logo-mark">⚡</div>HTML Host</div>
+  <div class="nav-links">
+    <select class="theme-select" id="themeSelect" onchange="applyTheme(this.value)">
+      <option value="dark-purple">🌙 暗夜紫</option>
+      <option value="dark-cyan">🌊 深海青</option>
+      <option value="light">☀️ 明亮浅</option>
+      <option value="oled">⬛ 纯黑 OLED</option>
+    </select>
+    <a href="/">返回首页</a>
+    <a href="/_admin">管理</a>
+  </div>
+</nav>
+
+<main class="wrap">
+  <div class="card">
+    <h1>匿名投稿</h1>
+    <p class="sub">无需登录即可发布一个临时 HTML 页面。系统自动分配随机访问路径，页面保留 <strong>30 天</strong>后自动过期清理。</p>
+    <div class="notice">⚠ 请不要提交钓鱼、恶意脚本或违法内容。所有页面会经过风险扫描并被标记，管理员可随时删除违规页面。</div>
+
+    <div class="drop-zone" id="dropZone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      <div>拖拽 HTML 文件到此处，或点击选择</div>
+      <input type="file" id="fileInput" accept=".html,.htm" hidden>
+    </div>
+
+    <div class="form-group">
+      <label>页面标题（可选，80 字以内）</label>
+      <input id="f-title" maxlength="80" placeholder="给页面起个名字">
+    </div>
+    <div class="form-group">
+      <label>HTML 内容</label>
+      <textarea id="f-content" placeholder="<!DOCTYPE html>..." oninput="scanRisk()"></textarea>
+    </div>
+    <div class="risk-box" id="riskBox"></div>
+
+    <div class="row">
+      <span class="hint">单页不超过 256KB · 每日投稿有数量限制</span>
+      <button class="btn btn-primary" id="submitBtn" onclick="submitPage()">发布页面</button>
+    </div>
+
+    <div class="result" id="resultBox">
+      <h3>✅ 发布成功</h3>
+      <div class="result-link">
+        <a id="resultUrl" href="#" target="_blank"></a>
+        <button class="copy-btn" onclick="copyUrl()">复制链接</button>
+        <span id="resultBadge"></span>
+      </div>
+      <div class="result-meta" id="resultMeta"></div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  try{ localStorage.setItem('hh-theme', t); }catch(e){}
+}
+(function(){
+  let t = 'dark-purple';
+  try{ t = localStorage.getItem('hh-theme') || t; }catch(e){}
+  document.documentElement.setAttribute('data-theme', t);
+  const sel = document.getElementById('themeSelect');
+  if(sel) sel.value = t;
+})();
+
+function scanHtml(html){
+  const warnings=[];
+  if(/<script[\\s>]/i.test(html)) warnings.push('包含 <script> 脚本标签');
+  if(/on\\w+\\s*=/i.test(html)) warnings.push('包含内联事件处理器（onclick 等）');
+  if(/javascript:/i.test(html)) warnings.push('包含 javascript: 伪协议链接');
+  if(/<iframe/i.test(html)) warnings.push('包含 iframe 嵌入');
+  if(/<form/i.test(html)) warnings.push('包含表单（可能用于钓鱼）');
+  if(/url\\(\\s*[\\'\\\"]?https?:/i.test(html)) warnings.push('引用了外部资源');
+  let risk='safe';
+  if(warnings.length>=3) risk='high'; else if(warnings.length>=1) risk='medium';
+  return {risk,warnings};
+}
+function scanRisk(){
+  const html=document.getElementById('f-content').value;
+  const box=document.getElementById('riskBox');
+  if(!html.trim()){box.className='risk-box';box.innerHTML='';return;}
+  const r=scanHtml(html);
+  if(r.risk==='safe'){box.className='risk-box';box.innerHTML='';return;}
+  const cls=r.risk==='high'?'warn-high':'warn-medium';
+  const title=r.risk==='high'?'⚠ 高风险内容，请确认来源可信':'◐ 包含潜在风险元素';
+  box.className='risk-box '+cls;
+  box.innerHTML='<strong>'+title+'</strong><ul>'+r.warnings.map(w=>'<li>'+w+'</li>').join('')+'</ul>';
+}
+
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+dropZone.onclick=()=>fileInput.click();
+dropZone.ondragover=e=>{e.preventDefault();dropZone.classList.add('dragover')};
+dropZone.ondragleave=()=>dropZone.classList.remove('dragover');
+dropZone.ondrop=e=>{e.preventDefault();dropZone.classList.remove('dragover');
+  if(e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0])};
+fileInput.onchange=e=>{if(e.target.files[0]) readFile(e.target.files[0])};
+function readFile(f){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    document.getElementById('f-content').value=reader.result;
+    if(!document.getElementById('f-title').value)
+      document.getElementById('f-title').value=f.name.replace(/\\.html?$/i,'');
+    scanRisk();toast('已加载：'+f.name);
+  };
+  reader.readAsText(f);
+}
+
+async function submitPage(){
+  const title=document.getElementById('f-title').value.trim();
+  const content=document.getElementById('f-content').value;
+  if(!content.trim()){toast('请填写 HTML 内容');return}
+  const btn=document.getElementById('submitBtn');
+  btn.disabled=true;btn.textContent='发布中…';
+  try{
+    const r=await fetch('/_api/public-upload',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({title,content})});
+    const d=await r.json();
+    if(!d.ok){toast(d.error||'发布失败');return}
+    const url=location.origin+d.url;
+    document.getElementById('resultUrl').textContent=url;
+    document.getElementById('resultUrl').href=d.url;
+    const badgeMap={safe:['badge-safe','✓ 安全'],medium:['badge-medium','◐ 中风险'],high:['badge-high','⚠ 高风险']};
+    const b=badgeMap[d.risk]||badgeMap.safe;
+    document.getElementById('resultBadge').innerHTML='<span class="badge '+b[0]+'">'+b[1]+'</span>';
+    const exp=new Date(d.expires_at*1000).toLocaleDateString('zh-CN');
+    document.getElementById('resultMeta').textContent='链接将于 '+exp+' 过期 · 随机路径，无法自选';
+    document.getElementById('resultBox').classList.add('show');
+  }catch(e){toast('网络错误，请重试')}
+  finally{btn.disabled=false;btn.textContent='发布页面'}
+}
+function copyUrl(){
+  const url=document.getElementById('resultUrl').textContent;
+  navigator.clipboard.writeText(url).then(()=>toast('链接已复制')).catch(()=>toast('复制失败，请手动复制'));
+}
+
+let toastTimer;
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>`;
