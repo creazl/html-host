@@ -76,9 +76,9 @@ npx wrangler d1 execute html-host-db --file=./schema.sql
 node scripts/gen-admin.mjs
 ```
 
-### 7. 设置管理密码
+### 7. 配置本地变量
 
-编辑 `wrangler.toml`，修改 `ADMIN_PASSWORD` 为你的密码：
+编辑 `wrangler.toml`，填入上面的 KV `id`、D1 `database_id`，并修改 `ADMIN_PASSWORD`：
 
 ```toml
 [vars]
@@ -136,14 +136,15 @@ npx wrangler deploy
 
 ```
 html-host/
-├── wrangler.toml       # Cloudflare 配置
+├── wrangler.toml       # Cloudflare 配置（仓库内为脱敏占位，本地填写真实值）
 ├── schema.sql          # D1 数据库表结构
 ├── package.json
+├── .gitignore
 ├── scripts/
 │   └── gen-admin.mjs   # 由 admin.html 生成 admin.ts
 ├── src/
 │   ├── index.ts        # Worker 入口（Hono 路由）
-│   ├── admin.ts        # 管理面板 HTML（内嵌，生成产物）
+│   ├── admin.ts        # 管理面板 HTML（内嵌，生成产物，不入库）
 │   ├── landing.ts      # 首页介绍页（内嵌）
 │   └── upload.ts       # 匿名投稿页（内嵌）
 └── public/
