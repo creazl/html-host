@@ -11,6 +11,7 @@
 - **访问统计** — 自动统计浏览量，管理面板一目了然
 - **搜索管理** — 快速搜索、编辑、删除页面
 - **修改密码** — 后台可直接修改管理密码，无需重新部署
+- **风险扫描** — 上传时自动识别脚本、表单、iframe 等风险元素并分级标记
 - **全球加速** — Cloudflare 边缘网络，毫秒级响应
 - **免费使用** — 免费额度足够个人使用
 
@@ -65,7 +66,15 @@ npx wrangler d1 create html-host-db
 npx wrangler d1 execute html-host-db --file=./schema.sql
 ```
 
-### 6. 设置管理密码
+### 6. 生成内嵌面板模块
+
+`src/admin.ts` 由 `public/admin.html` 生成，首次拉取代码或修改面板后执行：
+
+```bash
+node scripts/gen-admin.mjs
+```
+
+### 7. 设置管理密码
 
 编辑 `wrangler.toml`，修改 `ADMIN_PASSWORD` 为你的密码：
 
@@ -74,7 +83,7 @@ npx wrangler d1 execute html-host-db --file=./schema.sql
 ADMIN_PASSWORD = "your-strong-password"
 ```
 
-### 7. 部署
+### 8. 部署
 
 ```bash
 npx wrangler deploy
@@ -128,9 +137,11 @@ html-host/
 ├── wrangler.toml       # Cloudflare 配置
 ├── schema.sql          # D1 数据库表结构
 ├── package.json
+├── scripts/
+│   └── gen-admin.mjs   # 由 admin.html 生成 admin.ts
 ├── src/
 │   ├── index.ts        # Worker 入口（Hono 路由）
-│   ├── admin.ts        # 管理面板 HTML（内嵌）
+│   ├── admin.ts        # 管理面板 HTML（内嵌，生成产物）
 │   └── landing.ts      # 首页介绍页（内嵌）
 └── public/
     └── admin.html      # 管理面板源码（用于生成 admin.ts）
@@ -149,6 +160,55 @@ html-host/
 | `/_api/page/:path` | GET | 获取页面内容 |
 | `/_api/page/:path` | DELETE | 删除页面 |
 | `/:path` | GET | 渲染 HTML 页面 |
+
+## 🛡️ 安全机制
+
+HTML 托管的核心矛盾：既要能上传任意 HTML（含脚本），又要控制恶意内容带来的风险。本项目采用**分层防御**。
+
+### 已实施
+
+**1. 上传层风险扫描（标记，不拦截）**
+
+保存时自动扫描内容，识别以下风险元素：`<script>`、内联事件 `onclick=` 等、`javascript:` 伪协议、`<iframe>`、`<form>` 表单、外部资源引用。按数量分级：
+
+| 等级 | 判定 | 面板标识 |
+|---|---|---|
+| `safe` | 无风险元素 | ✓ 安全（绿） |
+| `medium` | 1–2 项风险 | ◐ 中风险（黄） |
+| `high` | 3 项及以上 | ⚠ 高风险（红） |
+
+扫描结果存入 D1 `risk` 列，列表显示徽章；编辑器内实时列出具体警告项。**默认只标记不拦截**——因为自有的演示页、小工具常依赖内联脚本，硬拦截会导致页面无法使用。
+
+**2. 响应层 CSP 与安全头**
+
+每个托管页面返回：
+
+- `Content-Security-Policy`：`object-src 'none'`（禁 Flash/插件）、`base-uri 'self'`（禁篡改基底链接）、`frame-src 'self'`、`form-action 'self'`（表单只能提交本站）；图片/字体允许 `self` 与外部 https
+- `X-Content-Type-Options: nosniff`：禁止 MIME 嗅探
+- `X-Frame-Options: SAMEORIGIN`：禁止被第三方站点套帧点击劫持
+- `Referrer-Policy: no-referrer`：不向外链泄露来源
+
+**3. 预览层沙箱隔离**
+
+后台「预览」在 `sandbox` iframe 中通过 `srcdoc` 渲染，与线上环境隔离；预览不会计入浏览量。
+
+**4. 访问控制**
+
+- 所有 `/_api/*` 接口必须携带 Bearer 管理密码
+- 管理密码存于 KV，可在后台修改，优先于环境变量
+- 私密页面凭 `?pass=` 访问
+
+### 已知限制
+
+- 页面与后台当前**同域**：页面内的脚本理论上处于同源上下文。管理 token 存于浏览器 `sessionStorage`（非 Cookie），刷新/关闭标签即失效，能降低被脚本读取后沿用的风险，但不能完全消除同源脚本的能力。
+- 扫描是正则启发式判断，不是沙箱执行；绕过写法（如拆分标签、动态拼接）可能漏检。
+
+### 可选加固（按需）
+
+1. **分离子域**：把托管页面放到独立子域（如 `pages.example.com`），后台留在 `admin.example.com`，浏览器按源隔离，页面脚本访问不到后台会话。
+2. **严格模式**：若不需要脚本，可在 CSP 中去掉 `unsafe-inline` 与 `script-src`，或在保存前过滤 `<script>`/`on*=`。
+3. **强密码 + 入口隐藏**：管理后台使用长随机密码，不在公开渠道传播 `/_admin` 链接。
+4. **定期清理**：删除不再使用的页面，减少暴露面。
 
 ## 📄 License
 
