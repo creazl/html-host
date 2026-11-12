@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>测试页面 · HTML Host</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  background:linear-gradient(135deg,#0f0a1e 0%,#1a1033 50%,#0a1a2e 100%);
+  color:#e8e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
+.card{background:rgba(255,255,255,.05);border:1px solid rgba(124,92,252,.2);
+  border-radius:24px;padding:3rem;max-width:560px;width:100%;text-align:center;
+  backdrop-filter:blur(10px);box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.badge{display:inline-block;padding:.35rem 1rem;border-radius:100px;
+  background:rgba(124,92,252,.15);color:#9078ff;font-size:.8rem;font-weight:600;
+  border:1px solid rgba(124,92,252,.3);margin-bottom:1.5rem}
+h1{font-size:2.2rem;font-weight:800;margin-bottom:1rem;
+  background:linear-gradient(135deg,#fff,#9078ff,#4dd6ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{color:#7a7a9e;line-height:1.7;margin-bottom:2rem}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:2rem 0}
+.stat{background:rgba(255,255,255,.04);border-radius:12px;padding:1rem}
+.stat-num{font-size:1.5rem;font-weight:700;color:#4dd6ff}
+.stat-label{font-size:.75rem;color:#7a7a9e;margin-top:.25rem}
+.checklist{text-align:left;margin:1.5rem 0}
+.checklist li{list-style:none;padding:.5rem 0;color:#a0a0c0}
+.checklist li::before{content:'✓ ';color:#3ddc97;font-weight:700}
+.btn{display:inline-block;margin-top:1rem;padding:.7rem 1.6rem;border-radius:10px;
+  background:linear-gradient(135deg,#7c5cfc,#5a3df0);color:#fff;text-decoration:none;
+  font-weight:600;transition:.2s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(124,92,252,.4)}
+.time{font-size:.8rem;color:#4a4a6a;margin-top:1.5rem}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="badge">⚡ HTML Host 测试页面</div>
+  <h1>部署成功！</h1>
+  <p class="subtitle">如果你能看到这个页面，说明 HTML Host 服务已经正常工作。你的 HTML 文件被正确托管并渲染。</p>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-num">✅</div><div class="stat-label">HTML 渲染</div></div>
+    <div class="stat"><div class="stat-num">🎨</div><div class="stat-label">样式加载</div></div>
+    <div class="stat"><div class="stat-num">⚡</div><div class="stat-label">边缘加速</div></div>
+  </div>
+
+  <ul class="checklist">
+    <li>页面通过 Cloudflare 边缘网络送达</li>
+    <li>自定义 URL 路径生效</li>
+    <li>中文显示正常</li>
+    <li>响应式布局适配移动端</li>
+  </ul>
+
+  <a class="btn" href="/_admin">进入管理面板</a>
+  <div class="time" id="time"></div>
+</div>
+
+<script>
+document.getElementById('time').textContent = '加载时间：' + new Date().toLocaleString('zh-CN');
+</script>
+</body>
+</html>
