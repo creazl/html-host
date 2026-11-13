@@ -77,6 +77,10 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
   border:1px solid color-mix(in srgb,var(--red) 30%,transparent);color:var(--red)}
 .risk-box ul{margin:.3rem 0 0 1.1rem}
 
+.tool-row{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem}
+.tool-btn{background:var(--panel);border:1px solid var(--border);color:var(--muted);
+  border-radius:9px;padding:.4rem .8rem;font-size:.78rem;cursor:pointer;transition:.15s}
+.tool-btn:hover{color:var(--text);border-color:var(--muted)}
 .row{display:flex;gap:.75rem;justify-content:space-between;align-items:center;flex-wrap:wrap}
 .btn{padding:.75rem 1.5rem;border:none;border-radius:12px;font-size:.9rem;font-weight:600;
   cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:.4rem}
@@ -146,9 +150,18 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
       <input id="f-title" maxlength="80" placeholder="给页面起个名字">
     </div>
     <div class="form-group">
+      <label>页面描述（可选，用于分享卡片摘要）</label>
+      <input id="f-description" maxlength="200" placeholder="一句话介绍这个页面">
+    </div>
+    <div class="form-group">
       <label>HTML 内容</label>
+      <div class="tool-row">
+        <button type="button" class="tool-btn" onclick="pickImage()">🖼 插入图片</button>
+        <span class="hint">图片将上传到图床并以直链插入</span>
+      </div>
       <textarea id="f-content" placeholder="<!DOCTYPE html>..." oninput="scanRisk()"></textarea>
     </div>
+    <input type="file" id="imgInput" accept="image/*" hidden>
     <div class="risk-box" id="riskBox"></div>
 
     <div class="row">
@@ -190,7 +203,7 @@ function scanHtml(html){
   if(/javascript:/i.test(html)) warnings.push('包含 javascript: 伪协议链接');
   if(/<iframe/i.test(html)) warnings.push('包含 iframe 嵌入');
   if(/<form/i.test(html)) warnings.push('包含表单（可能用于钓鱼）');
-  if(/url\\(\\s*[\\'\\\"]?https?:/i.test(html)) warnings.push('引用了外部资源');
+  if(/url\\(\\s*[\\'\\"]?https?:/i.test(html)) warnings.push('引用了外部资源');
   let risk='safe';
   if(warnings.length>=3) risk='high'; else if(warnings.length>=1) risk='medium';
   return {risk,warnings};
@@ -228,6 +241,7 @@ function readFile(f){
 
 async function submitPage(){
   const title=document.getElementById('f-title').value.trim();
+  const description=document.getElementById('f-description').value.trim();
   const content=document.getElementById('f-content').value;
   if(!content.trim()){toast('请填写 HTML 内容');return}
   const btn=document.getElementById('submitBtn');
@@ -235,7 +249,7 @@ async function submitPage(){
   try{
     const r=await fetch('/_api/public-upload',{method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({title,content})});
+      body:JSON.stringify({title,description,content})});
     const d=await r.json();
     if(!d.ok){toast(d.error||'发布失败');return}
     const url=location.origin+d.url;
@@ -254,6 +268,24 @@ function copyUrl(){
   const url=document.getElementById('resultUrl').textContent;
   navigator.clipboard.writeText(url).then(()=>toast('链接已复制')).catch(()=>toast('复制失败，请手动复制'));
 }
+
+function insertAtCursor(ta,text){
+  const s=ta.selectionStart||0,e=ta.selectionEnd||0;
+  ta.value=ta.value.slice(0,s)+text+ta.value.slice(e);
+  ta.focus();
+}
+function pickImage(){document.getElementById('imgInput').click()}
+document.getElementById('imgInput').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const fd=new FormData();fd.append('file',f);
+    const r=await fetch('/_api/upload-image',{method:'POST',body:fd});
+    const d=await r.json();
+    if(!d.ok){toast(d.error||'图片上传失败');return}
+    insertAtCursor(document.getElementById('f-content'), '<img src="' + d.url + '" alt="">');
+    scanRisk();toast('图片已插入');
+  }catch(err){toast('图片上传失败，请重试')}
+};
 
 let toastTimer;
 function toast(msg){
