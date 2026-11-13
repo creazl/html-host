@@ -44,7 +44,7 @@ function imgHost(c: any): string {
 }
 
 function esc(s: unknown): string {
-  return String(s ?? "").replace(/[&<>"']/g, (ch) =>
+  return String(s ?? "").replace(/[&<>'"]/g, (ch) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[ch]
   );
 }
@@ -257,6 +257,29 @@ app.post("/_api/public-upload", async (c) => {
   return c.json({ ok: true, path, url: `/${path}`, risk, warnings, expires_at: expiresAt });
 });
 
+// ---------- API: public meta lookup (anonymous, by explicit paths only) ----------
+
+app.post("/_api/public/meta", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const paths: string[] = Array.isArray(body.paths)
+    ? body.paths.slice(0, 50).map(String).map(sanitizePath).filter(Boolean)
+    : [];
+  if (!paths.length) return c.json({ items: {} });
+  const placeholders = paths.map(() => "?").join(",");
+  const res = await c.env.DB.prepare(
+    `SELECT path, title, risk, expires_at, status FROM pages WHERE path IN (${placeholders})`
+  ).bind(...paths).all();
+  const items: Record<string, any> = {};
+  for (const row of res.results as any[]) {
+    items[row.path] = {
+      title: row.title, risk: row.risk,
+      expires_at: row.expires_at, status: row.status,
+    };
+  }
+  for (const p of paths) if (!(p in items)) items[p] = null;
+  return c.json({ items });
+});
+
 // ---------- API: image upload forwarded to TG image host ----------
 
 app.post("/_api/upload-image", async (c) => {
@@ -290,7 +313,7 @@ app.post("/_api/upload-image", async (c) => {
 
 // ---------- API: toggle page visibility (admin) ----------
 
-app.post("/_api/page/:path/status", async (c) => {
+app.post("/_api/page/:path{.+}/status", async (c) => {
   if (!(await isAdmin(c))) return c.json({ error: "未授权" }, 401);
   const path = sanitizePath(c.req.param("path"));
   const body = await c.req.json().catch(() => ({}));
