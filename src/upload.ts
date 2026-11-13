@@ -103,6 +103,20 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
 .badge-high{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red)}
 .result-meta{font-size:.78rem;color:var(--muted);margin-top:.6rem}
 
+.my-posts{margin-top:1.6rem}
+.mp-title{font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:.7rem}
+.mp-item{display:flex;align-items:center;gap:.8rem;padding:.8rem 1rem;
+  border:1px solid var(--border);border-radius:12px;margin-bottom:.6rem;background:var(--panel)}
+.mp-info{flex:1;min-width:0}
+.mp-name{font-size:.88rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-meta{font-size:.75rem;color:var(--muted);margin-top:.2rem;display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+.mp-on{color:var(--green)}
+.mp-off{color:var(--red)}
+.mp-actions{display:flex;gap:.4rem;flex-shrink:0;align-items:center}
+.mp-link{color:var(--accent);text-decoration:none;font-size:.8rem;font-weight:600}
+.mp-del{background:transparent;border:none;color:var(--faint);font-size:.78rem;cursor:pointer}
+.mp-del:hover{color:var(--red)}
+
 .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(10px);
   background:var(--panel-2);padding:.7rem 1.3rem;border-radius:11px;border:1px solid var(--border);
   font-size:.85rem;opacity:0;transition:.3s;z-index:200}
@@ -178,6 +192,8 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
       </div>
       <div class="result-meta" id="resultMeta"></div>
     </div>
+
+    <div class="my-posts" id="myPosts"></div>
   </div>
 </main>
 
@@ -261,6 +277,8 @@ async function submitPage(){
     const exp=new Date(d.expires_at*1000).toLocaleDateString('zh-CN');
     document.getElementById('resultMeta').textContent='链接将于 '+exp+' 过期 · 随机路径，无法自选';
     document.getElementById('resultBox').classList.add('show');
+    addPost({path:d.path,title:title,risk:d.risk,exp:d.expires_at,ts:Math.floor(Date.now()/1000)});
+    renderMyPosts(null);refreshMeta();
   }catch(e){toast('网络错误，请重试')}
   finally{btn.disabled=false;btn.textContent='发布页面'}
 }
@@ -268,6 +286,80 @@ function copyUrl(){
   const url=document.getElementById('resultUrl').textContent;
   navigator.clipboard.writeText(url).then(()=>toast('链接已复制')).catch(()=>toast('复制失败，请手动复制'));
 }
+
+// ---- my posts remembered in a cookie (this browser only) ----
+function getMyPosts(){
+  try{
+    const m=document.cookie.match(/(?:^|; )hh-my-posts=([^;]*)/);
+    if(!m) return [];
+    const arr=JSON.parse(decodeURIComponent(m[1]));
+    return Array.isArray(arr)?arr:[];
+  }catch(e){return []}
+}
+function saveMyPosts(arr){
+  document.cookie='hh-my-posts='+encodeURIComponent(JSON.stringify(arr))+
+    '; path=/; max-age='+(30*86400)+'; SameSite=Lax';
+}
+function addPost(rec){
+  const arr=getMyPosts().filter(function(p){return p.path!==rec.path});
+  arr.unshift(rec);
+  saveMyPosts(arr.slice(0,20));
+}
+function forgetPost(path){
+  saveMyPosts(getMyPosts().filter(function(p){return p.path!==path}));
+  renderMyPosts(lastMeta);
+  toast('已移除本地记录');
+}
+function escHtml(s){
+  return String(s==null?'':s).replace(/[&<>'"]/g,function(ch){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
+  });
+}
+let lastMeta=null;
+function renderMyPosts(meta){
+  lastMeta=meta||lastMeta;
+  const box=document.getElementById('myPosts');
+  const arr=getMyPosts();
+  if(!arr.length){box.innerHTML='';return}
+  const now=Date.now()/1000;
+  let html='<div class="mp-title">📁 我投过的稿件（'+arr.length+'）</div>';
+  arr.forEach(function(p){
+    let status;
+    if(lastMeta&&lastMeta[p.path]===null){status='<span class="mp-off">已删除/过期</span>'}
+    else if(lastMeta&&lastMeta[p.path]&&lastMeta[p.path].status==='hidden'){status='<span class="mp-off">已下架</span>'}
+    else if(p.exp&&p.exp<now){status='<span class="mp-off">已过期</span>'}
+    else{status='<span class="mp-on">在线</span>'}
+    const expDate=p.exp?new Date(p.exp*1000).toLocaleDateString('zh-CN'):'-';
+    const title=escHtml(p.title||p.path);
+    const path=escHtml(p.path);
+    html+='<div class="mp-item">'+
+      '<div class="mp-info"><div class="mp-name">'+title+'</div>'+
+      '<div class="mp-meta"><span>/'+path+'</span><span>⏳ '+expDate+' 过期</span>'+status+'</div></div>'+
+      '<div class="mp-actions">'+
+      '<a class="mp-link" href="/'+path+'" target="_blank">打开</a>'+
+      '<button class="copy-btn" onclick="copyPost(\''+path+'\')">复制</button>'+
+      '<button class="mp-del" onclick="forgetPost(\''+path+'\')">移除</button>'+
+      '</div></div>';
+  });
+  box.innerHTML=html;
+}
+async function refreshMeta(){
+  const arr=getMyPosts();
+  if(!arr.length) return;
+  try{
+    const r=await fetch('/_api/public/meta',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({paths:arr.map(function(p){return p.path})})});
+    const d=await r.json();
+    renderMyPosts(d.items||{});
+  }catch(e){renderMyPosts(null)}
+}
+function copyPost(path){
+  navigator.clipboard.writeText(location.origin+'/'+path)
+    .then(function(){toast('链接已复制')}).catch(function(){toast('复制失败，请手动复制')});
+}
+renderMyPosts(null);
+refreshMeta();
 
 function insertAtCursor(ta,text){
   const s=ta.selectionStart||0,e=ta.selectionEnd||0;
