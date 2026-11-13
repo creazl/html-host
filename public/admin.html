@@ -250,7 +250,7 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;
   <div class="toolbar">
     <div class="search-wrap">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="text" id="search" placeholder="搜索页面..." oninput="renderList()">
+      <input type="text" id="search" placeholder="搜索页面..." oninput="onSearchInput()">
     </div>
   </div>
 
@@ -475,7 +475,9 @@ function renderList(){
     </div>`;
   }).join('');
 }
-function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function esc(s){return String(s==null?'':s).replace(/[&<>'"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]})}
+let searchTimer;
+function onSearchInput(){clearTimeout(searchTimer);searchTimer=setTimeout(renderList,150)}
 
 function scanHtml(html){
   const warnings=[];
