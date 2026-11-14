@@ -50,6 +50,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:1rem 0
 .nav-links a.active{color:var(--primary-2);font-weight:600}
 .theme-select{background:var(--panel);border:1px solid var(--border);color:var(--text);
   border-radius:10px;padding:.45rem .7rem;font-size:.82rem;outline:none;cursor:pointer}
+.theme-select option{background:var(--bg);color:var(--text)}
 
 .head{margin-bottom:1.5rem}
 .head h1{font-size:1.5rem;font-weight:800;margin-bottom:.35rem}
