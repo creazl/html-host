@@ -141,6 +141,7 @@ footer a{color:var(--primary);text-decoration:none}
       <option value="oled">⬛ 纯黑 OLED</option>
     </select>
     <a href="#features">功能</a>
+    <a href="/explore">目录</a>
     <a href="/upload">投稿</a>
     <a href="/_admin">管理面板</a>
   </div>
@@ -152,7 +153,7 @@ footer a{color:var(--primary);text-decoration:none}
   <p class="subtitle">轻量级自托管 HTML 页面发布服务。上传文件、自定义路径、即刻上线，无需 Git、无需构建。</p>
   <div class="cta">
     <a href="/upload" class="btn btn-primary">立即投稿 →</a>
-    <a href="#features" class="btn btn-ghost">查看功能</a>
+    <a href="/explore" class="btn btn-ghost">浏览目录</a>
   </div>
   <div class="strip">
     <div class="strip-item"><div class="strip-num">⚡ 边缘</div><div class="strip-label">全球节点加速</div></div>
