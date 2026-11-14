@@ -122,6 +122,13 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
   font-size:.85rem;opacity:0;transition:.3s;z-index:200}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+.preview-overlay{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:1rem}
+.preview-overlay.active{display:flex}
+.preview-box{background:var(--bg);border:1px solid var(--border);border-radius:18px;width:100%;max-width:860px;height:85vh;display:flex;flex-direction:column;overflow:hidden}
+.preview-head{display:flex;justify-content:space-between;align-items:center;padding:.8rem 1rem;border-bottom:1px solid var(--border)}
+.preview-head span{font-weight:600;font-size:.9rem}
+.preview-frame{flex:1;border:none;width:100%;background:#fff}
+
 @media(max-width:640px){
   .wrap{padding:1.1rem}
   .card{padding:1.3rem;border-radius:16px}
@@ -161,19 +168,21 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
 
     <div class="form-group">
       <label>页面标题（可选，80 字以内）</label>
-      <input id="f-title" maxlength="80" placeholder="给页面起个名字">
+      <input id="f-title" maxlength="80" placeholder="给页面起个名字" oninput="saveDraft()">
     </div>
     <div class="form-group">
       <label>页面描述（可选，用于分享卡片摘要）</label>
-      <input id="f-description" maxlength="200" placeholder="一句话介绍这个页面">
+      <input id="f-description" maxlength="200" placeholder="一句话介绍这个页面" oninput="saveDraft()">
     </div>
     <div class="form-group">
       <label>HTML 内容</label>
       <div class="tool-row">
         <button type="button" class="tool-btn" onclick="pickImage()">🖼 插入图片</button>
-        <span class="hint">图片将上传到图床并以直链插入</span>
+        <button type="button" class="tool-btn" onclick="openPreview()">👁 预览</button>
+        <button type="button" class="tool-btn" onclick="clearDraft()">🗑 清空草稿</button>
+        <span class="hint">图片将上传到图床并以直链插入 · 草稿自动保存在本机</span>
       </div>
-      <textarea id="f-content" placeholder="<!DOCTYPE html>..." oninput="scanRisk()"></textarea>
+      <textarea id="f-content" placeholder="<!DOCTYPE html>..." oninput="scanRisk();saveDraft()"></textarea>
     </div>
     <input type="file" id="imgInput" accept="image/*" hidden>
     <div class="risk-box" id="riskBox"></div>
@@ -198,6 +207,13 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
 </main>
 
 <div class="toast" id="toast"></div>
+
+<div class="preview-overlay" id="previewModal">
+  <div class="preview-box">
+    <div class="preview-head"><span>👁 预览（沙箱隔离）</span><button class="copy-btn" onclick="closePreview()">✕ 关闭</button></div>
+    <iframe class="preview-frame" id="previewFrame" sandbox="allow-forms allow-modals allow-popups allow-same-origin allow-scripts"></iframe>
+  </div>
+</div>
 
 <script>
 function applyTheme(t){
@@ -236,6 +252,44 @@ function scanRisk(){
   box.innerHTML='<strong>'+title+'</strong><ul>'+r.warnings.map(w=>'<li>'+w+'</li>').join('')+'</ul>';
 }
 
+// ---- draft autosaved in localStorage (this browser only) ----
+let draftTimer;
+function saveDraft(){
+  clearTimeout(draftTimer);
+  draftTimer=setTimeout(function(){
+    var title=document.getElementById('f-title').value;
+    var description=document.getElementById('f-description').value;
+    var content=document.getElementById('f-content').value;
+    try{
+      if(!title && !description && !content.trim()){ localStorage.removeItem('hh-draft'); return; }
+      localStorage.setItem('hh-draft', JSON.stringify({title:title,description:description,content:content}));
+    }catch(e){}
+  },500);
+}
+function restoreDraft(){
+  try{
+    var raw=localStorage.getItem('hh-draft');
+    if(!raw) return false;
+    var d=JSON.parse(raw);
+    if(!d || !d.content) return false;
+    document.getElementById('f-title').value=d.title||'';
+    document.getElementById('f-description').value=d.description||'';
+    document.getElementById('f-content').value=d.content||'';
+    scanRisk();
+    return true;
+  }catch(e){return false}
+}
+function clearDraft(){
+  document.getElementById('f-title').value='';
+  document.getElementById('f-description').value='';
+  document.getElementById('f-content').value='';
+  try{localStorage.removeItem('hh-draft')}catch(e){}
+  scanRisk();toast('草稿已清空');
+}
+function dropDraft(){
+  try{localStorage.removeItem('hh-draft')}catch(e){}
+}
+
 const dropZone=document.getElementById('dropZone');
 const fileInput=document.getElementById('fileInput');
 dropZone.onclick=()=>fileInput.click();
@@ -255,6 +309,25 @@ function readFile(f){
   reader.readAsText(f);
 }
 
+async function submitPost(payload, attempt){
+  const ctrl=new AbortController();
+  const timer=setTimeout(function(){ctrl.abort()},18000);
+  try{
+    const r=await fetch('/_api/public-upload',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload),signal:ctrl.signal});
+    clearTimeout(timer);
+    const d=await r.json().catch(function(){return {ok:false,error:'响应解析失败'}});
+    if(d.ok) return {d, retryable:false};
+    // 400/413/429 为确定性错误，不重试
+    const retryable = !(r.status===400||r.status===413||r.status===429);
+    return {d, retryable};
+  }catch(e){
+    clearTimeout(timer);
+    return {d:{ok:false,error:'网络较慢或连接中断，已重试仍失败'}, retryable:true};
+  }
+}
+
 async function submitPage(){
   const title=document.getElementById('f-title').value.trim();
   const description=document.getElementById('f-description').value.trim();
@@ -262,12 +335,18 @@ async function submitPage(){
   if(!content.trim()){toast('请填写 HTML 内容');return}
   const btn=document.getElementById('submitBtn');
   btn.disabled=true;btn.textContent='发布中…';
-  try{
-    const r=await fetch('/_api/public-upload',{method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({title,description,content})});
-    const d=await r.json();
-    if(!d.ok){toast(d.error||'发布失败');return}
+  const payload={title,description,content};
+  let result=null;
+  for(let attempt=1; attempt<=2; attempt++){
+    btn.textContent=attempt>1?'重试中…':'发布中…';
+    const res=await submitPost(payload,attempt);
+    result=res;
+    if(res.d.ok || !res.retryable) break;
+    await new Promise(function(r){setTimeout(r,1200)});
+  }
+  const d=result?result.d:{ok:false,error:'网络错误，请重试'};
+  if(!d.ok){toast(d.error||'发布失败')}
+  else{
     const url=location.origin+d.url;
     document.getElementById('resultUrl').textContent=url;
     document.getElementById('resultUrl').href=d.url;
@@ -278,9 +357,10 @@ async function submitPage(){
     document.getElementById('resultMeta').textContent='链接将于 '+exp+' 过期 · 随机路径，无法自选';
     document.getElementById('resultBox').classList.add('show');
     addPost({path:d.path,title:title,risk:d.risk,exp:d.expires_at,ts:Math.floor(Date.now()/1000)});
+    dropDraft();
     renderMyPosts(null);refreshMeta();
-  }catch(e){toast('网络错误，请重试')}
-  finally{btn.disabled=false;btn.textContent='发布页面'}
+  }
+  btn.disabled=false;btn.textContent='发布页面';
 }
 function copyUrl(){
   const url=document.getElementById('resultUrl').textContent;
@@ -311,7 +391,7 @@ function forgetPost(path){
   toast('已移除本地记录');
 }
 function escHtml(s){
-  return String(s==null?'':s).replace(/[&<>'"]/g,function(ch){
+  return String(s==null?'':s).replace(/[&<>"']/g,function(ch){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
   });
 }
@@ -337,8 +417,8 @@ function renderMyPosts(meta){
       '<div class="mp-meta"><span>/'+path+'</span><span>⏳ '+expDate+' 过期</span>'+status+'</div></div>'+
       '<div class="mp-actions">'+
       '<a class="mp-link" href="/'+path+'" target="_blank">打开</a>'+
-      '<button class="copy-btn" onclick="copyPost(\''+path+'\')">复制</button>'+
-      '<button class="mp-del" onclick="forgetPost(\''+path+'\')">移除</button>'+
+      '<button class="copy-btn" onclick="copyPost(\\''+path+'\\')">复制</button>'+
+      '<button class="mp-del" onclick="forgetPost(\\''+path+'\\')">移除</button>'+
       '</div></div>';
   });
   box.innerHTML=html;
@@ -360,6 +440,7 @@ function copyPost(path){
 }
 renderMyPosts(null);
 refreshMeta();
+if(restoreDraft()) toast('已恢复上次未发布的草稿');
 
 function insertAtCursor(ta,text){
   const s=ta.selectionStart||0,e=ta.selectionEnd||0;
@@ -367,6 +448,13 @@ function insertAtCursor(ta,text){
   ta.focus();
 }
 function pickImage(){document.getElementById('imgInput').click()}
+function openPreview(){
+  const content=document.getElementById('f-content').value;
+  if(!content.trim()){toast('请先填写 HTML 内容');return}
+  document.getElementById('previewFrame').srcdoc=content;
+  document.getElementById('previewModal').classList.add('active');
+}
+function closePreview(){document.getElementById('previewModal').classList.remove('active')}
 document.getElementById('imgInput').onchange=async e=>{
   const f=e.target.files[0];e.target.value='';if(!f)return;
   try{
