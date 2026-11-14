@@ -64,6 +64,7 @@ nav{display:flex;align-items:center;justify-content:space-between;
 
 .theme-select{background:var(--panel);border:1px solid var(--border);color:var(--text);
   border-radius:10px;padding:.45rem .7rem;font-size:.82rem;outline:none;cursor:pointer}
+.theme-select option{background:var(--bg);color:var(--text)}
 
 .hero{text-align:center;padding:5.5rem 0 3.5rem}
 .badge{display:inline-flex;align-items:center;gap:.45rem;padding:.4rem 1rem;
