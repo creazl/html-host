@@ -2,6 +2,8 @@ node_modules/
 .wrangler/
 dist/
 .dev.vars
+.env
+.env.*
 *.log
 
 # 生成产物：由 public/admin.html 经 scripts/gen-admin.mjs 生成
