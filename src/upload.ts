@@ -102,6 +102,9 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
 .badge-medium{background:color-mix(in srgb,var(--yellow) 15%,transparent);color:var(--yellow)}
 .badge-high{background:color-mix(in srgb,var(--red) 15%,transparent);color:var(--red)}
 .result-meta{font-size:.78rem;color:var(--muted);margin-top:.6rem}
+.result-qr{margin-top:1rem;display:none}
+.result-qr img{width:140px;height:140px;border-radius:12px;background:#fff;padding:8px}
+.result-qr .qr-hint{font-size:.75rem;color:var(--faint);margin-top:.4rem}
 
 .my-posts{margin-top:1.6rem}
 .mp-title{font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:.7rem}
@@ -150,6 +153,7 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
       <option value="oled">⬛ 纯黑 OLED</option>
     </select>
     <a href="/">返回首页</a>
+    <a href="/explore">目录</a>
     <a href="/_admin">管理</a>
   </div>
 </nav>
@@ -200,6 +204,10 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
         <span id="resultBadge"></span>
       </div>
       <div class="result-meta" id="resultMeta"></div>
+      <div class="result-qr" id="resultQr">
+        <img id="resultQrImg" alt="分享二维码">
+        <div class="qr-hint">扫码即可在手机上打开该页面</div>
+      </div>
     </div>
 
     <div class="my-posts" id="myPosts"></div>
@@ -216,6 +224,7 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
 </div>
 
 <script>
+var QR_API='https://api.qrserver.com/v1/create-qr-code/?size=280x280&margin=4&data=';
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme', t);
   try{ localStorage.setItem('hh-theme', t); }catch(e){}
@@ -235,7 +244,7 @@ function scanHtml(html){
   if(/javascript:/i.test(html)) warnings.push('包含 javascript: 伪协议链接');
   if(/<iframe/i.test(html)) warnings.push('包含 iframe 嵌入');
   if(/<form/i.test(html)) warnings.push('包含表单（可能用于钓鱼）');
-  if(/url\\(\\s*[\\'\\"]?https?:/i.test(html)) warnings.push('引用了外部资源');
+  if(/url\\(\\s*[\\'\\\"]?https?:/i.test(html)) warnings.push('引用了外部资源');
   let risk='safe';
   if(warnings.length>=3) risk='high'; else if(warnings.length>=1) risk='medium';
   return {risk,warnings};
@@ -355,6 +364,8 @@ async function submitPage(){
     document.getElementById('resultBadge').innerHTML='<span class="badge '+b[0]+'">'+b[1]+'</span>';
     const exp=new Date(d.expires_at*1000).toLocaleDateString('zh-CN');
     document.getElementById('resultMeta').textContent='链接将于 '+exp+' 过期 · 随机路径，无法自选';
+    document.getElementById('resultQrImg').src=QR_API+encodeURIComponent(url);
+    document.getElementById('resultQr').style.display='block';
     document.getElementById('resultBox').classList.add('show');
     addPost({path:d.path,title:title,risk:d.risk,exp:d.expires_at,ts:Math.floor(Date.now()/1000)});
     dropDraft();
@@ -391,7 +402,7 @@ function forgetPost(path){
   toast('已移除本地记录');
 }
 function escHtml(s){
-  return String(s==null?'':s).replace(/[&<>"']/g,function(ch){
+  return String(s==null?'':s).replace(/[&<>'"]/g,function(ch){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
   });
 }
