@@ -23,7 +23,9 @@ const MAX_CONTENT = 256 * 1024; // 256 KB
 const MAX_IMAGE = 8 * 1024 * 1024; // 8 MB
 const DAILY_UPLOAD_LIMIT = 20;
 const HISTORY_LIMIT = 5;
-const DEFAULT_IMG_HOST = "https://imgs.creazlen.top";
+// Optional TG image host; set via the IMG_HOST binding/variable. Empty means
+// image upload is disabled until a host is configured.
+const DEFAULT_IMG_HOST = "";
 
 // Cache strategy: static shells are immutable at the edge/browser for a short
 // TTL with stale-while-revalidate; public pages get a short cache; admin and
@@ -321,9 +323,12 @@ app.post("/_api/upload-image", async (c) => {
   const fd = new FormData();
   fd.append("file", file, file.name || "image.png");
 
+  const host = imgHost(c);
+  if (!host) return c.json({ error: "图床未配置，请在环境变量 IMG_HOST 中设置图床地址" }, 501);
+
   let upstream: Response;
   try {
-    upstream = await fetch(`${imgHost(c)}/upload`, { method: "POST", body: fd });
+    upstream = await fetch(`${host}/upload`, { method: "POST", body: fd });
   } catch {
     return c.json({ error: "图床连接失败，请稍后重试" }, 502);
   }
@@ -333,7 +338,7 @@ app.post("/_api/upload-image", async (c) => {
   const src: string | undefined = Array.isArray(data) ? data[0]?.src : data?.src;
   if (!src) return c.json({ error: "图床未返回图片地址" }, 502);
 
-  const url = src.startsWith("http") ? src : `${imgHost(c)}${src}`;
+  const url = src.startsWith("http") ? src : `${host}${src}`;
   return c.json({ ok: true, url });
 });
 
