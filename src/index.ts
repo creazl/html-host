@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { ADMIN_HTML } from "./admin";
 import { LANDING_HTML } from "./landing";
 import { UPLOAD_HTML } from "./upload";
+import { EXPLORE_HTML } from "./explore";
 
 type Bindings = {
   PAGES_KV: KVNamespace;
@@ -139,6 +140,7 @@ function injectMeta(html: string, tags: string): string {
 
 app.get("/", (c) => c.html(LANDING_HTML));
 app.get("/upload", (c) => c.html(UPLOAD_HTML));
+app.get("/explore", (c) => c.html(EXPLORE_HTML));
 app.get("/_admin", (c) => c.html(ADMIN_HTML));
 
 // ---------- API: auth ----------
@@ -278,6 +280,21 @@ app.post("/_api/public/meta", async (c) => {
   }
   for (const p of paths) if (!(p in items)) items[p] = null;
   return c.json({ items });
+});
+
+// ---------- API: public directory (anonymous, public non-private pages only) ----------
+
+app.get("/_api/public/directory", async (c) => {
+  const now = Math.floor(Date.now() / 1000);
+  const { results } = await c.env.DB.prepare(
+    `SELECT path, title, description, cover, views, risk, owner, updated_at, expires_at
+     FROM pages
+     WHERE status = 'approved' AND password = ''
+       AND (expires_at = 0 OR expires_at > ?)
+     ORDER BY updated_at DESC
+     LIMIT 200`
+  ).bind(now).all();
+  return c.json({ pages: results });
 });
 
 // ---------- API: image upload forwarded to TG image host ----------
