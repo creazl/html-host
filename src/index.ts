@@ -25,6 +25,15 @@ const DAILY_UPLOAD_LIMIT = 20;
 const HISTORY_LIMIT = 5;
 const DEFAULT_IMG_HOST = "https://imgs.creazlen.top";
 
+// Cache strategy: static shells are immutable at the edge/browser for a short
+// TTL with stale-while-revalidate; public pages get a short cache; admin and
+// password-protected pages are never cached.
+const SHELL_CACHE = "public, max-age=300, stale-while-revalidate=86400";
+const ADMIN_CACHE = "no-store";
+const PUBLIC_PAGE_CACHE = "public, max-age=60, stale-while-revalidate=300";
+const PRIVATE_PAGE_CACHE = "private, no-store";
+const VARY_ENCODING = "Accept-Encoding";
+
 // ---------- helpers ----------
 
 function sanitizePath(p: string): string {
@@ -45,7 +54,7 @@ function imgHost(c: any): string {
 }
 
 function esc(s: unknown): string {
-  return String(s ?? "").replace(/[&<>'"]/g, (ch) =>
+  return String(s ?? "").replace(/[&<>"']/g, (ch) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[ch]
   );
 }
@@ -138,10 +147,10 @@ function injectMeta(html: string, tags: string): string {
 
 // ---------- pages ----------
 
-app.get("/", (c) => c.html(LANDING_HTML));
-app.get("/upload", (c) => c.html(UPLOAD_HTML));
-app.get("/explore", (c) => c.html(EXPLORE_HTML));
-app.get("/_admin", (c) => c.html(ADMIN_HTML));
+app.get("/", (c) => c.html(LANDING_HTML, 200, { "Cache-Control": SHELL_CACHE, "Vary": VARY_ENCODING }));
+app.get("/upload", (c) => c.html(UPLOAD_HTML, 200, { "Cache-Control": SHELL_CACHE, "Vary": VARY_ENCODING }));
+app.get("/explore", (c) => c.html(EXPLORE_HTML, 200, { "Cache-Control": SHELL_CACHE, "Vary": VARY_ENCODING }));
+app.get("/_admin", (c) => c.html(ADMIN_HTML, 200, { "Cache-Control": ADMIN_CACHE, "Vary": VARY_ENCODING }));
 
 // ---------- API: auth ----------
 
@@ -279,7 +288,7 @@ app.post("/_api/public/meta", async (c) => {
     };
   }
   for (const p of paths) if (!(p in items)) items[p] = null;
-  return c.json({ items });
+  return c.json({ items }, 200, { "Cache-Control": "public, max-age=30", "Vary": VARY_ENCODING });
 });
 
 // ---------- API: public directory (anonymous, public non-private pages only) ----------
@@ -294,7 +303,7 @@ app.get("/_api/public/directory", async (c) => {
      ORDER BY updated_at DESC
      LIMIT 200`
   ).bind(now).all();
-  return c.json({ pages: results });
+  return c.json({ pages: results }, 200, { "Cache-Control": "public, max-age=30", "Vary": VARY_ENCODING });
 });
 
 // ---------- API: image upload forwarded to TG image host ----------
@@ -399,7 +408,7 @@ app.get("/*", async (c) => {
   const url = new URL(c.req.url);
   const path = sanitizePath(url.pathname.replace(/^\/+/, ""));
   if (!path) {
-    return c.html(LANDING_HTML);
+    return c.html(LANDING_HTML, 200, { "Cache-Control": SHELL_CACHE, "Vary": VARY_ENCODING });
   }
 
   const content = await c.env.PAGES_KV.get(`page:${path}`);
@@ -445,7 +454,7 @@ padding:0.6rem 1.5rem;border-radius:10px;cursor:pointer;font-weight:600}
 <input type="password" name="pass" placeholder="请输入密码" autofocus>
 <br><button type="submit">解锁</button>
 </form>
-</div></body></html>`);
+</div></body></html>`, 200, { "Cache-Control": PRIVATE_PAGE_CACHE, "Vary": VARY_ENCODING });
     }
   }
 
@@ -484,13 +493,16 @@ padding:0.6rem 1.5rem;border-radius:10px;cursor:pointer;font-weight:600}
     "form-action 'self'",
   ].join("; ");
 
+  const cacheControl = meta?.password ? PRIVATE_PAGE_CACHE : PUBLIC_PAGE_CACHE;
+
   return c.html(finalHtml, 200, {
     "Content-Type": "text/html; charset=utf-8",
     "Content-Security-Policy": csp,
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "SAMEORIGIN",
     "Referrer-Policy": "no-referrer",
-    "Cache-Control": "public, max-age=0, must-revalidate",
+    "Cache-Control": cacheControl,
+    "Vary": VARY_ENCODING,
   });
 });
 
