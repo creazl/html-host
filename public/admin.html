@@ -252,6 +252,11 @@ body::before{content:'';position:fixed;inset:0;z-index:-1;
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input type="text" id="search" placeholder="搜索页面..." oninput="onSearchInput()">
     </div>
+    <select class="theme-select" id="sortSelect" onchange="renderList()">
+      <option value="updated">最新更新</option>
+      <option value="views">最热浏览</option>
+      <option value="expires">即将过期</option>
+    </select>
   </div>
 
   <div class="page-list" id="pageList"></div>
@@ -429,6 +434,19 @@ function renderList(){
   const filtered = pages.filter(p =>
     p.path.toLowerCase().includes(q) || (p.title||'').toLowerCase().includes(q) ||
     (p.description||'').toLowerCase().includes(q));
+  const sort = document.getElementById('sortSelect').value;
+  const sorted = [...filtered];
+  if(sort === 'views'){
+    sorted.sort((a,b)=>(b.views||0)-(a.views||0));
+  }else if(sort === 'expires'){
+    sorted.sort((a,b)=>{
+      const ea=(a.expires_at&&a.expires_at>0)?a.expires_at:Number.MAX_SAFE_INTEGER;
+      const eb=(b.expires_at&&b.expires_at>0)?b.expires_at:Number.MAX_SAFE_INTEGER;
+      return ea-eb;
+    });
+  }else{
+    sorted.sort((a,b)=>(b.updated_at||0)-(a.updated_at||0));
+  }
   if(!filtered.length){
     list.innerHTML = `<div class="empty">
       <div class="empty-icon">📄</div>
@@ -437,7 +455,7 @@ function renderList(){
     </div>`;
     return;
   }
-  list.innerHTML = filtered.map(p => {
+  list.innerHTML = sorted.map(p => {
     const date = new Date(p.updated_at*1000).toLocaleDateString('zh-CN');
     let expire = '';
     if(p.expires_at && p.expires_at > 0){
@@ -469,6 +487,8 @@ function renderList(){
       <div class="page-actions">
         <button class="btn btn-ghost btn-sm" onclick="window.open('/${esc(p.path)}','_blank')">访问</button>
         <button class="btn btn-ghost btn-sm" onclick="editPage('${esc(p.path)}')">编辑</button>
+        <button class="btn btn-ghost btn-sm" onclick="clonePage('${esc(p.path)}')">克隆</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadPage('${esc(p.path)}','${esc(p.title||p.path)}')">下载源码</button>
         ${toggleBtn}
         <button class="btn btn-danger btn-sm" onclick="delPage('${esc(p.path)}','${esc(p.title||p.path)}')">删除</button>
       </div>
@@ -532,6 +552,39 @@ async function editPage(path){
   scanRisk();
   await loadHistory(path);
   document.getElementById('editorModal').classList.add('active');
+}
+async function downloadPage(path,title){
+  try{
+    const r=await fetch('/_api/page/'+path,{headers:authHeaders()});
+    if(!r.ok){toast('加载失败');return}
+    const d=await r.json();
+    if(!d.content){toast('内容为空');return}
+    const blob=new Blob([d.content],{type:'text/html;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=String(title||path).replace(/[\\/:*?"<>|]/g,'_')+'.html';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(a.href)},1000);
+    toast('源码已下载');
+  }catch(e){toast('下载失败，请重试')}
+}
+async function clonePage(path){
+  try{
+    const r=await fetch('/_api/page/'+path,{headers:authHeaders()});
+    if(!r.ok){toast('加载失败');return}
+    const d=await r.json();
+    editingPath='';
+    document.getElementById('editorTitle').textContent='克隆自：'+path;
+    document.getElementById('f-path').value='';
+    document.getElementById('f-title').value=(d.meta.title||'副本')+' 副本';
+    document.getElementById('f-description').value=d.meta.description||'';
+    document.getElementById('f-cover').value=d.meta.cover||'';
+    document.getElementById('f-password').value='';
+    document.getElementById('f-content').value=d.content;
+    scanRisk();
+    document.getElementById('editorModal').classList.add('active');
+    toast('已载入副本，请填写新路径后保存');
+  }catch(e){toast('克隆失败，请重试')}
 }
 async function savePage(){
   const path=document.getElementById('f-path').value.trim();
