@@ -46,6 +46,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:1rem 0
 .nav-links a:hover{color:var(--text)}
 .theme-select{background:var(--panel);border:1px solid var(--border);color:var(--text);
   border-radius:10px;padding:.45rem .7rem;font-size:.82rem;outline:none;cursor:pointer}
+.theme-select option{background:var(--bg);color:var(--text)}
 
 .card{background:var(--panel);border:1px solid var(--border);border-radius:20px;
   padding:1.8rem;backdrop-filter:blur(12px)}
@@ -402,7 +403,7 @@ function forgetPost(path){
   toast('已移除本地记录');
 }
 function escHtml(s){
-  return String(s==null?'':s).replace(/[&<>'"]/g,function(ch){
+  return String(s==null?'':s).replace(/[&<>"']/g,function(ch){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];
   });
 }
