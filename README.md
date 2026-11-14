@@ -40,7 +40,7 @@
 | D1 | 存储页面元数据 | 500 万次读/天，10 万次写/天 |
 | TG 图床（外部） | 托管上传的图片，返回公开直链 | 复用自有 Telegram Bot 图床项目 |
 
-> 图床地址通过环境变量 `IMG_HOST` 配置，默认 `https://imgs.creazlen.top`；图片由 Worker 服务端转发到图床 `/upload` 接口，浏览器不直连图床，规避跨域问题。
+> 图床地址通过环境变量 `IMG_HOST` 配置（可选，不配置则图片上传接口不可用）；图片由 Worker 服务端转发到图床 `/upload` 接口，浏览器不直连图床，规避跨域问题。
 
 ## 🚀 快速部署
 
@@ -95,11 +95,13 @@ node scripts/gen-admin.mjs
 
 ### 7. 配置本地变量
 
-编辑 `wrangler.toml`，填入上面的 KV `id`、D1 `database_id`，并修改 `ADMIN_PASSWORD`：
+编辑 `wrangler.toml`，填入上面的 KV `id`、D1 `database_id`，并修改 `ADMIN_PASSWORD`；`IMG_HOST` 为可选图床地址，不配则禁用图片上传：
 
 ```toml
 [vars]
 ADMIN_PASSWORD = "your-strong-password"
+# 可选：TG 图床地址（服务端转发，浏览器不直连），不配则图片上传不可用
+IMG_HOST = "https://your-image-host.example.com"
 ```
 
 ### 8. 部署
