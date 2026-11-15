@@ -286,4 +286,4 @@ HTML 托管的核心矛盾：既要能上传任意 HTML（含脚本），又要�
 
 ## 📄 License
 
-本项目基于 [MIT License](./LICENSE) 开源，Copyright (c) 2026 creazl。
+本项目基于 [GNU GPL v3.0](./LICENSE) 开源（GPL-3.0-only），Copyright (c) 2026 creazl。GPL 具有 copyleft 性质：基于本项目的衍生作品必须以相同协议开源。
