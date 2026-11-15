@@ -1,7 +1,7 @@
 {
   "name": "html-host",
   "version": "1.0.0",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
