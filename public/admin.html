@@ -611,9 +611,9 @@ async function savePage(){
   const password=document.getElementById('f-password').value;
   const content=document.getElementById('f-content').value;
   if(!path){toast('请填写 URL 路径');return}
-  // ≤1M 字符走普通 JSON 接口；更大的内容改走原始 body 通道（上限 4M 字符）
-  const JSON_LIMIT=1048576, RAW_LIMIT=4194304;
-  if(content.length>RAW_LIMIT){toast('内容过大，上限约 4M 字符（约 4MB 纯 ASCII）');return}
+  // ≤1M 字符走普通 JSON 接口；更大的内容改走原始 body 通道（按 UTF-8 字节上限 25MB）
+  const JSON_LIMIT=1048576, RAW_LIMIT=26214400;
+  if(content.length>RAW_LIMIT){toast('内容过大，单页上限 25MB（中文按约 3 字节/字估算）');return}
   const useRaw=content.length>JSON_LIMIT;
   const meta=encodeURIComponent(JSON.stringify({path,title,description,cover,password}));
   const r = useRaw
