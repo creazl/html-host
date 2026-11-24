@@ -19,12 +19,13 @@ app.use("*", cors());
 // ---------- constants ----------
 
 const PUBLIC_TTL = 30 * 86400; // 30 days
-// Size limits are expressed in characters (UTF-16 units), not bytes.
-// KV itself allows up to 25 MiB per value, but a Worker invocation is bounded
-// by CPU time (JSON.parse of the body) and 128 MB memory, so the JSON API is
-// kept at 1M chars while large admin saves use the raw-body endpoint.
+// KV allows one value up to 25 MiB (26,214,400 bytes). The real ceilings for
+// a Worker invocation are CPU time (JSON.parse ≈5ms/MB) and 128 MB memory,
+// so: JSON API stays at 1M chars; large admin saves use the raw-body endpoint
+// and are capped by UTF-8 *bytes* (sampled estimate) rather than char count.
 const MAX_CONTENT = 1024 * 1024; // 1M chars — JSON API (admin small saves + anonymous uploads)
-const MAX_CONTENT_RAW = 4 * 1024 * 1024; // 4M chars — admin raw-body save
+const MAX_CONTENT_RAW_CHARS = 25 * 1024 * 1024; // hard cap in chars (bytes ≥ chars, so this is a fast pre-check)
+const MAX_CONTENT_RAW_BYTES = 25 * 1024 * 1024; // 25 MiB — matches the KV per-value ceiling
 const SCAN_MAX = 256 * 1024; // risk scanning samples at most the first 256K chars
 const MAX_IMAGE = 8 * 1024 * 1024; // 8 MB
 const DAILY_UPLOAD_LIMIT = 20;
@@ -109,6 +110,16 @@ function scanHtml(html: string): { risk: string; warnings: string[] } {
 // cheap and the invocation stays inside the CPU budget.
 function scanFor(content: string): { risk: string; warnings: string[] } {
   return scanHtml(content.length > SCAN_MAX ? content.slice(0, SCAN_MAX) : content);
+}
+
+// UTF-8 byte length without paying a full-string TextEncoder pass on huge docs:
+// small documents get an exact count, large ones are extrapolated from the
+// first 256K chars (cheap and accurate enough for mostly-uniform HTML).
+function estimateBytes(s: string): number {
+  const sample = 256 * 1024;
+  if (s.length <= sample) return new TextEncoder().encode(s).length;
+  const head = new TextEncoder().encode(s.slice(0, sample)).length;
+  return Math.round((head / sample) * s.length);
 }
 
 // ---- version history (stored in KV, latest first) ----
@@ -238,7 +249,12 @@ async function saveManagedPage(c: any, content: string, meta: any) {
   // snapshot the previous version before overwriting
   const previous = await c.env.PAGES_KV.get(`page:${path}`);
   await snapshotVersion(c, path, previous);
-  await c.env.PAGES_KV.put(`page:${path}`, content);
+  try {
+    await c.env.PAGES_KV.put(`page:${path}`, content);
+  } catch {
+    // KV rejects a single value above 25 MiB; surface it as a size error.
+    return c.json({ error: "内容过大，KV 单值上限 25MB 无法存储" }, 413);
+  }
 
   await c.env.DB.prepare(
     `INSERT INTO pages (path, title, password, risk, owner, expires_at, description, cover, status, views, created_at, updated_at)
@@ -275,8 +291,20 @@ app.post("/_api/upload-raw", async (c) => {
     meta = {};
   }
   const content = await c.req.text();
-  if (content.length > MAX_CONTENT_RAW) {
-    return c.json({ error: `内容超过 ${MAX_CONTENT_RAW / 1024 / 1024}M 字符限制` }, 413);
+  if (content.length > MAX_CONTENT_RAW_CHARS) {
+    return c.json(
+      { error: `内容过大（${(content.length / 1024 / 1024).toFixed(1)}M 字符，超过上限）` },
+      413
+    );
+  }
+  const bytes = estimateBytes(content);
+  if (bytes > MAX_CONTENT_RAW_BYTES) {
+    return c.json(
+      {
+        error: `内容过大（约 ${(bytes / 1024 / 1024).toFixed(1)}MB，上限 ${MAX_CONTENT_RAW_BYTES / 1024 / 1024}MB）`,
+      },
+      413
+    );
   }
   return saveManagedPage(c, content, meta);
 });
