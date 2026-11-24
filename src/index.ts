@@ -19,7 +19,13 @@ app.use("*", cors());
 // ---------- constants ----------
 
 const PUBLIC_TTL = 30 * 86400; // 30 days
-const MAX_CONTENT = 256 * 1024; // 256 KB
+// Size limits are expressed in characters (UTF-16 units), not bytes.
+// KV itself allows up to 25 MiB per value, but a Worker invocation is bounded
+// by CPU time (JSON.parse of the body) and 128 MB memory, so the JSON API is
+// kept at 1M chars while large admin saves use the raw-body endpoint.
+const MAX_CONTENT = 1024 * 1024; // 1M chars — JSON API (admin small saves + anonymous uploads)
+const MAX_CONTENT_RAW = 4 * 1024 * 1024; // 4M chars — admin raw-body save
+const SCAN_MAX = 256 * 1024; // risk scanning samples at most the first 256K chars
 const MAX_IMAGE = 8 * 1024 * 1024; // 8 MB
 const DAILY_UPLOAD_LIMIT = 20;
 const HISTORY_LIMIT = 5;
@@ -99,7 +105,14 @@ function scanHtml(html: string): { risk: string; warnings: string[] } {
   return { risk, warnings };
 }
 
+// Large documents are sampled (first SCAN_MAX chars) so the regex scan stays
+// cheap and the invocation stays inside the CPU budget.
+function scanFor(content: string): { risk: string; warnings: string[] } {
+  return scanHtml(content.length > SCAN_MAX ? content.slice(0, SCAN_MAX) : content);
+}
+
 // ---- version history (stored in KV, latest first) ----
+
 
 async function snapshotVersion(c: any, path: string, oldContent: string | null): Promise<void> {
   if (oldContent === null || oldContent === undefined) return;
@@ -208,19 +221,18 @@ app.get("/_api/page/:path{.+}", async (c) => {
 
 // ---------- API: upload / save (admin) ----------
 
-app.post("/_api/upload", async (c) => {
-  if (!(await isAdmin(c))) return c.json({ error: "未授权" }, 401);
-  const body = await c.req.json().catch(() => ({}));
-  let { path, title, content, password, description, cover } = body;
-  path = sanitizePath(path || "");
+// Shared save path: KV content + version snapshot + D1 metadata upsert.
+async function saveManagedPage(c: any, content: string, meta: any) {
+  const path = sanitizePath(meta.path || "");
   if (!path) return c.json({ error: "请填写 URL 路径" }, 400);
   if (!content) return c.json({ error: "内容不能为空" }, 400);
-  if (content.length > MAX_CONTENT) return c.json({ error: "内容超过 256KB 限制" }, 413);
 
-  description = String(description || "").slice(0, 200);
-  cover = String(cover || "").slice(0, 500);
+  const title = String(meta.title || "").slice(0, 100);
+  const password = String(meta.password || "").slice(0, 100);
+  const description = String(meta.description || "").slice(0, 200);
+  const cover = String(meta.cover || "").slice(0, 500);
 
-  const { risk, warnings } = scanHtml(content);
+  const { risk, warnings } = scanFor(content);
   const now = Math.floor(Date.now() / 1000);
 
   // snapshot the previous version before overwriting
@@ -236,6 +248,37 @@ app.post("/_api/upload", async (c) => {
         title || path, password || "", risk, description, cover, now).run();
 
   return c.json({ ok: true, path, url: `/${path}`, risk, warnings });
+}
+
+app.post("/_api/upload", async (c) => {
+  if (!(await isAdmin(c))) return c.json({ error: "未授权" }, 401);
+  const body = await c.req.json().catch(() => ({}));
+  const content = String(body.content || "");
+  if (content.length > MAX_CONTENT) {
+    return c.json(
+      { error: `内容超过 ${MAX_CONTENT / 1024}K 字符限制，超大文件请用后台编辑器保存` },
+      413
+    );
+  }
+  return saveManagedPage(c, content, body);
+});
+
+// Raw-body save for large documents: content travels as the request body so it
+// is never JSON.parse'd, keeping CPU low; small metadata rides in X-Meta.
+app.post("/_api/upload-raw", async (c) => {
+  if (!(await isAdmin(c))) return c.json({ error: "未授权" }, 401);
+  let meta: any = {};
+  try {
+    const h = c.req.header("x-meta") || "";
+    if (h) meta = JSON.parse(decodeURIComponent(h));
+  } catch {
+    meta = {};
+  }
+  const content = await c.req.text();
+  if (content.length > MAX_CONTENT_RAW) {
+    return c.json({ error: `内容超过 ${MAX_CONTENT_RAW / 1024 / 1024}M 字符限制` }, 413);
+  }
+  return saveManagedPage(c, content, meta);
 });
 
 // ---------- API: public anonymous upload ----------
@@ -246,7 +289,9 @@ app.post("/_api/public-upload", async (c) => {
   const title = String(body.title || "").slice(0, 80);
   const description = String(body.description || "").slice(0, 200);
   if (!content) return c.json({ error: "内容不能为空" }, 400);
-  if (content.length > MAX_CONTENT) return c.json({ error: "内容超过 256KB 限制" }, 413);
+  if (content.length > MAX_CONTENT) {
+    return c.json({ error: `内容超过 ${MAX_CONTENT / 1024}K 字符限制` }, 413);
+  }
   if (await rateLimited(c)) return c.json({ error: "今日投稿已达上限，请明天再试" }, 429);
 
   const { risk, warnings } = scanHtml(content);
