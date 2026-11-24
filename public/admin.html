@@ -611,8 +611,15 @@ async function savePage(){
   const password=document.getElementById('f-password').value;
   const content=document.getElementById('f-content').value;
   if(!path){toast('请填写 URL 路径');return}
-  const r = await fetch('/_api/upload',{method:'POST',headers:authHeaders(),
-    body:JSON.stringify({path,title,description,cover,password,content})});
+  // ≤1M 字符走普通 JSON 接口；更大的内容改走原始 body 通道（上限 4M 字符）
+  const JSON_LIMIT=1048576, RAW_LIMIT=4194304;
+  if(content.length>RAW_LIMIT){toast('内容过大，上限约 4M 字符（约 4MB 纯 ASCII）');return}
+  const useRaw=content.length>JSON_LIMIT;
+  const meta=encodeURIComponent(JSON.stringify({path,title,description,cover,password}));
+  const r = useRaw
+    ? await fetch('/_api/upload-raw',{method:'POST',headers:{'Authorization':'Bearer '+token,'X-Meta':meta,'Content-Type':'text/html; charset=utf-8'},body:content})
+    : await fetch('/_api/upload',{method:'POST',headers:authHeaders(),
+        body:JSON.stringify({path,title,description,cover,password,content})});
   const d = await r.json();
   if(d.ok){
     if(d.risk==='high') toast('⚠ 已保存，但标记为高风险');
