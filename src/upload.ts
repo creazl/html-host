@@ -193,7 +193,7 @@ h1{font-size:1.5rem;font-weight:800;margin-bottom:.4rem}
     <div class="risk-box" id="riskBox"></div>
 
     <div class="row">
-      <span class="hint">单页不超过 256KB · 每日投稿有数量限制</span>
+      <span class="hint">单页不超过 1MB（约 100 万字符） · 每日投稿有数量限制</span>
       <button class="btn btn-primary" id="submitBtn" onclick="submitPage()">发布页面</button>
     </div>
 
